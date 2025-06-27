@@ -28,7 +28,7 @@ VolMon is a powerful tool that monitors real-time cryptocurrency prices on Binan
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/yourusername/VolMon.git
+   git clone https://github.com/Lacri1/VolMon.git
    cd VolMon
    ```
 
@@ -72,7 +72,7 @@ You can configure the following in `volmon/config.py`:
 python main.py
 ```
 
-## 🛠 Usage Examples
+## Usage Examples
 
 ```bash
 # Run with default settings (monitors BTCUSDT, ETHUSDT)
@@ -82,7 +82,7 @@ python main.py
 # Or pass as command-line arguments (future implementation)
 ```
 
-## 📊 Example Output
+## Example Output
 
 ```
 === VolMon - Cryptocurrency Volatility Monitor ===
@@ -103,21 +103,10 @@ ETHUSDT   |        2,404.61 | 10:16:41
 [Notifier] Successfully sent alert to Discord
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request or open an issue.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-<div align="center">
-  <p>Created by: Your Name</p>
-  <p>
-    <a href="https://github.com/yourusername">GitHub</a> | 
-    <a href="https://twitter.com/yourusername">Twitter</a> | 
-    <a href="mailto:your.email@example.com">Email</a>
-  </p>
-</div>

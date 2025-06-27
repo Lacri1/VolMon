@@ -3,6 +3,7 @@
 import sys
 import os
 import time
+import logging
 from pathlib import Path
 import requests
 import json
@@ -10,6 +11,31 @@ import threading
 import websocket
 from datetime import datetime
 from typing import Dict
+
+# 로깅 설정
+def setup_logging():
+    # 로거 생성
+    logger = logging.getLogger('volmon')
+    logger.setLevel(logging.INFO)
+    
+    # 파일 핸들러 (로깅용)
+    file_handler = logging.FileHandler('volmon.log', encoding='utf-8')
+    file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s', 
+                                     datefmt='%Y-%m-%d %H:%M:%S')
+    file_handler.setFormatter(file_formatter)
+    
+    # 콘솔 핸들러 (에러만 표시)
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(logging.INFO)
+    console_formatter = logging.Formatter('%(message)s')
+    console_handler.setFormatter(console_formatter)
+    
+    # 핸들러 추가
+    logger.addHandler(file_handler)
+    
+    return logger
+
+logger = setup_logging()
 
 # 프로젝트 루트 디렉토리를 Python 경로에 추가
 sys.path.append(str(Path(__file__).parent))
@@ -19,42 +45,64 @@ from volmon.utils.notifier import send_alert
 from volmon.config import SYMBOLS, BASE_WEBSOCKET_URL, ALERT_THRESHOLD, TIME_WINDOW
 
 class PriceDisplay:
-    def __init__(self):
-        self.prices = {}  # 심볼별 가격 저장
+    def __init__(self, symbols):
+        self.prices = {}  # 가격 저장 딕셔너리
         self.last_update = {}  # 마지막 업데이트 시간 저장
         self.update_interval = 5  # 화면 갱신 주기(초)
         self.lock = threading.Lock()  # 스레드 안전을 위한 락
         self.last_display_time = 0  # 마지막 화면 갱신 시간
+        self.initial_prices_received = False  # 초기 가격 수신 여부
+        self.expected_symbols = set(symbol.upper() for symbol in symbols)  # 대소문자 구분 없이 처리
 
     def update_price(self, symbol: str, price: float):
         """가격을 업데이트하고 필요시 화면 갱신"""
         now = time.time()
+        symbol = symbol.upper()  # 대문자로 통일
+        
         with self.lock:
+            # 가격이 변경되지 않았으면 무시
+            if symbol in self.prices and self.prices[symbol] == price:
+                return
+                
             self.prices[symbol] = price
             self.last_update[symbol] = now
 
-            # 지정된 간격마다 화면 갱신
+            # 초기 가격이 아직 수신되지 않았을 때
+            if not self.initial_prices_received:
+                # 모든 심볼의 가격을 수신했는지 확인
+                if all(sym in self.prices for sym in self.expected_symbols):
+                    self.initial_prices_received = True
+                    self.last_display_time = now
+                    self._update_display()
+                return
+                
+            # 초기 가격 이후에는 주기적으로만 업데이트
             if now - self.last_display_time >= self.update_interval:
-                self._update_display()
                 self.last_display_time = now
+                self._update_display()
 
 
 
     def _update_display(self):
-        print("\n" * 3)  # 이전 출력과 구분을 위해 빈 줄 3개 추가
-
         # 헤더 출력
-        print("=== 암호화폐 가격 모니터 ===")
-        print(f"{'심볼':<10} | {'가격 (USDT)':>15} | 마지막 업데이트")
+        print("=== VolMon - Cryptocurrency Volatility Monitor ===")
+        print(f"Monitoring {len(self.expected_symbols)} coins - {', '.join(sorted(self.expected_symbols))}")
+        print(f"Alert threshold: {ALERT_THRESHOLD}% change within {TIME_WINDOW} seconds")
+        print("=" * 50 + "\n")
+        
+        # 가격 테이블 헤더
+        print("=== Cryptocurrency Price Monitor ===")
+        print(f"{'Symbol':<10} | {'Price (USDT)':>15} | Last Updated")
         print("-" * 50)
-
-        # 각 심볼별 가격 출력
-        for symbol in sorted(self.prices.keys()):
-            price = self.prices[symbol]
-            last_update = datetime.fromtimestamp(self.last_update[symbol]).strftime('%H:%M:%S')
-            price_str = f"{price:,.2f}"  # 천 단위 구분자 추가
+        
+        # 각 심볼별 가격 출력 (알파벳 순 정렬)
+        for symbol in sorted(self.expected_symbols):
+            price = self.prices.get(symbol, 0)
+            last_update_ts = self.last_update.get(symbol, 0)
+            last_update = datetime.fromtimestamp(last_update_ts).strftime('%H:%M:%S') if last_update_ts > 0 else '--:--:--'
+            price_str = f"{price:,.2f}" if price > 0 else 'Loading...'
             print(f"{symbol:<10} | {price_str:>15} | {last_update}")
-
+        
         sys.stdout.flush()  # 출력 버퍼 비우기
 
 class TickerMonitor:
@@ -62,10 +110,14 @@ class TickerMonitor:
         self.symbol = symbol.upper()  # 거래소 심볼 (예: BTCUSDT)
         self.display = display  # 가격 표시기
         self.detector = VolatilityDetector()  # 변동성 감지기
-        self.ws_url = f"{BASE_WEBSOCKET_URL}{symbol}@trade"  # 웹소켓 URL
+        self.ws_url = f"{BASE_WEBSOCKET_URL}{symbol.lower()}@trade"  # 웹소켓 URL (소문자로 통일)
         self.ws = None  # 웹소켓 연결 객체
         self.thread = None  # 웹소켓 스레드
         self.last_update_time = 0  # 마지막 업데이트 시간
+        self.last_price = 0  # 마지막 가격
+        self.last_processed_time = 0  # 마지막 처리 시간
+        self.message_queue = []  # 메시지 큐
+        self.processing = False  # 메시지 처리 중 플래그
 
     def get_current_price_rest(self) -> float:
         """REST API를 사용해 현재 가격 조회"""
@@ -79,62 +131,80 @@ class TickerMonitor:
             self.display.update_price(self.symbol, price)
             return price
         except Exception as e:
-            print(f"[{self.symbol}] REST API 오류: {str(e)[:100]}")
+            logger.error(f"[{self.symbol}] REST API 오류: {str(e)[:100]}")
             return -1
 
     def on_message(self, ws, message):
         """웹소켓 메시지 처리"""
         try:
+            current_time = time.time()
+            
+            # 0.1초 이내에 도착한 메시지는 무시
+            if current_time - self.last_processed_time < 0.1:
+                return
+                
             data = json.loads(message)
             price = float(data['p'])  # 현재 가격
-            current_time = time.time()
-
-            # 1초에 한 번만 가격 업데이트
-            if current_time - self.last_update_time >= 1.0:
-                self.display.update_price(self.symbol, price)
-                self.last_update_time = current_time
-
-            # 변동성 감지
-            detected, change = self.detector.detect(price)
             
-            # 변동성이 감지된 경우에만 알림 전송 및 로깅
-            if detected:
-                print(f"[{self.symbol}] 변동성 감지! 변동폭: {change:+.2f}% (임계값: {ALERT_THRESHOLD}%)")
-                send_alert(
-                    symbol=self.symbol,
-                    price=price,
-                    change=change
-                )
-
+            # 가격이 변경되지 않았으면 무시
+            if abs(price - self.last_price) < 0.01:  # 부동소수점 비교를 위한 작은 값 사용
+                return
+                
+            self.last_price = price
+            self.last_processed_time = current_time
+            
+            # 디스플레이 업데이트
+            self.display.update_price(self.symbol, price)
+            
+            # 1초에 한 번만 변동성 감지
+            if current_time - self.last_update_time >= 1.0:
+                detected, change = self.detector.detect(price)
+                self.last_update_time = current_time
+                
+                # 변동성이 감지된 경우에만 알림 전송 및 로깅
+                if detected:
+                    print(f"\n[{self.symbol}] Volatility detected! Change: {change:+.2f}% (Threshold: {ALERT_THRESHOLD}%)")
+                    send_alert(
+                        symbol=self.symbol,
+                        price=price,
+                        change=change
+                    )
+                
         except Exception as e:
-            print(f"[{self.symbol}] 메시지 처리 오류: {str(e)[:100]}")
+            logger.error(f"Error processing message: {str(e)[:100]}")
 
     def on_error(self, ws, error):
         """웹소켓 에러 처리"""
         if hasattr(error, 'status_code') and error.status_code == 429:
-            print(f"[{self.symbol}] 요청 제한 초과. 재연결 대기 중...")
+            logger.warning(f"[{self.symbol}] 요청 제한 초과. 재연결 대기 중...")
             time.sleep(60)  # 1분 대기
         else:
             print(f"[{self.symbol}] 오류: {str(error)[:100]}")
 
     def on_close(self, ws, close_status_code, close_msg):
         """웹소켓 연결 종료 처리"""
-        print(f"[{self.symbol}] 웹소켓 연결 종료. 재연결 시도 중...")
+        logger.warning(f"[{self.symbol}] 웹소켓 연결 종료. 재연결 시도 중...")
         time.sleep(5)
         self.start()  # 재연결 시도
 
     def on_open(self, ws):
         """웹소켓 연결 성공 시 호출"""
-        print(f"[{self.symbol}] 웹소켓 연결 성공")
+        # 로그 파일에만 기록 (화면에는 표시 안 함)
+        logger.debug(f"[{self.symbol}] Websocket connected")
 
     def start(self):
         """모니터링 시작"""
-        print(f"[VolMon] 모니터링 시작: {self.symbol}")
+        # 로그 파일에만 기록
+        logger.info(f"[VolMon] Starting monitoring: {self.symbol}")
 
         # 초기 가격 조회
         rest_price = self.get_current_price_rest()
         if rest_price > 0:
-            print(f"[{self.symbol}] 초기 가격: {rest_price:,.2f}")
+            logger.info(f"[{self.symbol}] Initial price: {rest_price:,.2f}")
+            # 화면에 즉시 반영
+            self.last_price = rest_price
+            self.last_processed_time = time.time()
+            self.display.update_price(self.symbol, rest_price)
 
         # 웹소켓 연결 시작
         self.ws = websocket.WebSocketApp(
@@ -151,26 +221,29 @@ class TickerMonitor:
         self.thread.start()
 
 def main():
-    # 초기 메시지 출력
-    print("=== VolMon - 암호화폐 변동성 모니터 ===")
-    print(f"모니터링 중인 코인: {len(SYMBOLS)}개 - {', '.join(s.upper() for s in SYMBOLS)}")
-    print(f"알림 기준: {TIME_WINDOW}초 내 {ALERT_THRESHOLD}% 이상 변동 시")
-    print("=" * 50 + "\n")
-
-    # 가격 표시기 생성
-    display = PriceDisplay()
-
-    # 각 심볼별 모니터 생성 및 시작
-    monitors = [TickerMonitor(symbol, display) for symbol in SYMBOLS]
+    display = PriceDisplay(SYMBOLS)  # 모든 심볼로 디스플레이 초기화
+    monitors = []
+    
+    # 모든 모니터 초기화
+    for symbol in SYMBOLS:
+        monitor = TickerMonitor(symbol, display)
+        monitors.append(monitor)
+    
+    # 모든 모니터 시작
     for monitor in monitors:
         monitor.start()
+        time.sleep(0.5)  # API 요청 간 간격 유지
+    
+    # 초기 화면 표시
+    display._update_display()
 
-    # 메인 스레드 유지
     try:
+        # 메인 스레드 유지
         while True:
             time.sleep(1)
     except KeyboardInterrupt:
-        print("\n모니터링을 종료합니다...")
+        print("\n프로그램을 종료합니다.")
+        sys.exit(0)
     except Exception as e:
         print(f"\n예상치 못한 오류 발생: {str(e)}")
     finally:
