@@ -103,10 +103,10 @@ ETHUSDT   |        2,404.61 | 10:16:41
 [Notifier] Successfully sent alert to Discord
 ```
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request or open an issue.
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
