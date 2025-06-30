@@ -17,9 +17,13 @@ BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
 
 # 모니터링 설정
 SYMBOLS = ['btcusdt', 'ethusdt']  # 모니터링할 코인 심볼
-ALERT_THRESHOLD = 1.0  # 변동성 알림 임계값 (%)
+ALERT_THRESHOLD = 0.3  # 변동성 알림 임계값 (%)
 TIME_WINDOW = 60  # 변동성 계산 기간 (초)
 REQUEST_TIMEOUT = 10  # API 요청 제한 시간 (초)
+
+# 보안 설정
+SECURITY_TOKEN = os.getenv("SECURITY_TOKEN", "default_secure_token_here")  # 외부 요청 검증용 토큰
+ALLOWED_WEBHOOK_IDS = os.getenv("ALLOWED_WEBHOOK_IDS", "").split(",")  # 허용할 웹훅 ID 목록 (쉼표로 구분)
 
 # 디스코드 웹훅 URL
 DISCORD_WEBHOOK_URL = os.getenv(

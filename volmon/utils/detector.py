@@ -8,6 +8,10 @@ class VolatilityDetector:
     def __init__(self):
         self.price_history = deque()  # (timestamp, price) 튜플을 저장하는 데크
         self.time_window = TIME_WINDOW  # 초 단위 시간 창
+        self.last_log_time = 0  # 마지막 로그 출력 시간
+        self.log_interval = 300  # 로그 출력 최소 간격 (초)
+        self.last_detected_change = 0  # 마지막 감지된 변동률
+        self.last_direction = 0  # 마지막 변동 방향 (1: 상승, -1: 하락, 0: 초기값)
 
     def detect(self, current_price: float):
         now = time.time()
@@ -29,7 +33,27 @@ class VolatilityDetector:
             price_change = ((current_price - oldest_price) / oldest_price) * 100
             
             if abs(price_change) >= ALERT_THRESHOLD:
-                print(f"[Detector] 변동성 감지! {price_change:.2f}% (임계값: {ALERT_THRESHOLD}%)")
+                current_time = time.time()
+                current_direction = 1 if price_change >= 0 else -1
+                
+                # 방향이 바뀌었거나, 로그 출력 간격이 지났거나, 변동률이 크게 증가한 경우에만 로그 출력
+                should_log = (
+                    current_time - self.last_log_time >= self.log_interval or
+                    current_direction != self.last_direction or
+                    abs(price_change) >= abs(self.last_detected_change) * 1.3
+                )
+                
+                if should_log:
+                    print(
+                        f"[Detector] 변동성 감지! {price_change:+.2f}% "
+                        f"(임계값: {ALERT_THRESHOLD}%, 이전: {self.last_detected_change:+.2f}%)"
+                    )
+                    self.last_log_time = current_time
+                
+                # 상태 업데이트
+                self.last_detected_change = price_change
+                self.last_direction = current_direction
+                
                 return True, price_change
 
         return False, 0
