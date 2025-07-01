@@ -60,12 +60,18 @@ class PriceDisplay:
         symbol = symbol.upper()  # 대문자로 통일
         
         with self.lock:
-            # 가격이 변경되지 않았으면 무시
-            if symbol in self.prices and self.prices[symbol] == price:
+            # 가격 업데이트 (변경 여부와 관계없이)
+            price_changed = symbol not in self.prices or self.prices[symbol] != price
+            if price_changed:
+                self.prices[symbol] = price
+            self.last_update[symbol] = now  # 항상 타임스탬프 업데이트
+            
+            # 가격이 변경되지 않았고 초기 가격도 수신된 상태면 화면 갱신만 수행
+            if not price_changed and self.initial_prices_received:
+                if now - self.last_display_time >= self.update_interval:
+                    self.last_display_time = now
+                    self._update_display()
                 return
-                
-            self.prices[symbol] = price
-            self.last_update[symbol] = now
 
             # 초기 가격이 아직 수신되지 않았을 때
             if not self.initial_prices_received:
@@ -146,29 +152,31 @@ class TickerMonitor:
             data = json.loads(message)
             price = float(data['p'])  # 현재 가격
             
-            # 가격이 변경되지 않았으면 무시
-            if abs(price - self.last_price) < 0.01:  # 부동소수점 비교를 위한 작은 값 사용
-                return
+            # 가격이 변경되었는지 확인
+            price_changed = abs(price - self.last_price) >= 0.01  # 부동소수점 비교를 위한 작은 값 사용
+        
+            # 가격이 변경되었거나, 1초 이상 지났으면 업데이트
+            if price_changed or (current_time - self.last_processed_time >= 1.0):
+                if price_changed:
+                    self.last_price = price
+                self.last_processed_time = current_time
                 
-            self.last_price = price
-            self.last_processed_time = current_time
-            
-            # 디스플레이 업데이트
-            self.display.update_price(self.symbol, price)
-            
-            # 1초에 한 번만 변동성 감지
-            if current_time - self.last_update_time >= 1.0:
-                detected, change = self.detector.detect(price)
-                self.last_update_time = current_time
+                # 디스플레이 업데이트 (타임스탬프 갱신을 위해 항상 호출)
+                self.display.update_price(self.symbol, self.last_price)
                 
-                # 변동성이 감지된 경우에만 알림 전송 및 로깅
-                if detected:
-                    print(f"\n[{self.symbol}] Volatility detected! Change: {change:+.2f}% (Threshold: {ALERT_THRESHOLD}%)")
-                    send_alert(
-                        symbol=self.symbol,
-                        price=price,
-                        change=change
-                    )
+                # 1초에 한 번만 변동성 감지
+                if current_time - self.last_update_time >= 1.0:
+                    detected, change = self.detector.detect(price)
+                    self.last_update_time = current_time
+                    
+                    # 변동성이 감지된 경우에만 알림 전송 및 로깅
+                    if detected:
+                        print(f"\n[{self.symbol}] Volatility detected! Change: {change:+.2f}% (Threshold: {ALERT_THRESHOLD}%)")
+                        send_alert(
+                            symbol=self.symbol,
+                            price=price,
+                            change=change
+                        )
                 
         except Exception as e:
             logger.error(f"Error processing message: {str(e)[:100]}")
