@@ -84,11 +84,11 @@ def create_alert_message(symbol: str, price: float, change: float, **kwargs) -> 
     """알림 메시지 생성"""
     # 기본 메시지 생성
     message = sanitize_mentions(
-        f"🚨 변동성 알림!\n"
-        f"🔢 티커: {symbol.upper()}\n"
-        f"💰 가격: ${price:,.2f}\n"
-        f"📈 변동률: {change:+.2f}% ({TIME_WINDOW}초 기준)\n"
-        f"⏰ 시간: {kwargs.get('timestamp', '')}"
+        f"변동성 알림!\n"
+        f"티커: {symbol.upper()}\n"
+        f"가격: ${price:,.2f}\n"
+        f"변동률: {change:+.2f}% ({TIME_WINDOW}초 기준)\n"
+        f"시간: {kwargs.get('timestamp', '')}"
     )
     
     return {

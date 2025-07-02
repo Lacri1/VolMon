@@ -50,20 +50,39 @@ VolMon is a powerful tool that monitors real-time cryptocurrency prices on Binan
 
 ### Environment Variables
 
-Create a `.env` file with the following variables:
+Create a `.env` file in the project root with the following variables:
 
 ```env
-DISCORD_WEBHOOK_URL=your_discord_webhook_url_here
-BINANCE_API_KEY=your_api_key_optional
-BINANCE_API_SECRET=your_api_secret_optional
+# Binance API Credentials (Required for private endpoints)
+BINANCE_API_KEY=your_binance_api_key_here
+BINANCE_API_SECRET=your_binance_api_secret_here
+
+# Discord Webhook Configuration (Required for notifications)
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/your_webhook_id/your_webhook_token
+ALLOWED_WEBHOOK_IDS=your_webhook_id  # The numeric ID from your webhook URL
+
+# Application Security (Required)
+SECURITY_TOKEN=your_secure_random_token_here  # For API request validation
 ```
+
+#### Environment Variables Description
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `BINANCE_API_KEY` | Optional* | Your Binance API key (required for private endpoints) |
+| `BINANCE_API_SECRET` | Optional* | Your Binance API secret key (required for private endpoints) |
+| `DISCORD_WEBHOOK_URL` | **Required** | Full Discord webhook URL for sending alerts |
+| `ALLOWED_WEBHOOK_IDS` | **Required** | The webhook ID extracted from your Discord webhook URL |
+| `SECURITY_TOKEN` | **Required** | Random token for API request validation |
+
+> *Note: Binance API keys are optional for basic price monitoring but required if you need access to private endpoints.
 
 ### Configuration
 
 You can configure the following in `volmon/config.py`:
 
 - `SYMBOLS`: List of cryptocurrency pairs to monitor (default: `['btcusdt', 'ethusdt']`)
-- `ALERT_THRESHOLD`: Volatility threshold for alerts in percentage (default: `1.0`)
+- `ALERT_THRESHOLD`: Volatility threshold for alerts in percentage (default: `0.3`)
 - `TIME_WINDOW`: Time window in seconds for volatility calculation (default: `60`)
 
 ### Running the Application

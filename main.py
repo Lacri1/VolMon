@@ -172,10 +172,12 @@ class TickerMonitor:
                     # 변동성이 감지된 경우에만 알림 전송 및 로깅
                     if detected:
                         print(f"\n[{self.symbol}] Volatility detected! Change: {change:+.2f}% (Threshold: {ALERT_THRESHOLD}%)")
+                        current_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                         send_alert(
                             symbol=self.symbol,
                             price=price,
-                            change=change
+                            change=change,
+                            timestamp=current_time
                         )
                 
         except Exception as e:

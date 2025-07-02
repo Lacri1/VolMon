@@ -2,7 +2,7 @@
 
 import os
 from dotenv import load_dotenv
-from typing import Dict
+from typing import Dict, List
 
 # 환경 변수 로드
 load_dotenv()
@@ -11,9 +11,9 @@ load_dotenv()
 BASE_API_URL = 'https://api.binance.com'  # REST API 기본 주소
 BASE_WEBSOCKET_URL = 'wss://stream.binance.com:9443/ws/'  # 웹소켓 주소
 
-# API 키 (선택사항)
-BINANCE_API_KEY = os.getenv("BINANCE_API_KEY", "")
-BINANCE_API_SECRET = os.getenv("BINANCE_API_SECRET", "")
+# API 키 (필수)
+BINANCE_API_KEY = os.environ["BINANCE_API_KEY"]
+BINANCE_API_SECRET = os.environ["BINANCE_API_SECRET"]
 
 # 모니터링 설정
 SYMBOLS = ['btcusdt', 'ethusdt']  # 모니터링할 코인 심볼
@@ -22,14 +22,11 @@ TIME_WINDOW = 60  # 변동성 계산 기간 (초)
 REQUEST_TIMEOUT = 10  # API 요청 제한 시간 (초)
 
 # 보안 설정
-SECURITY_TOKEN = os.getenv("SECURITY_TOKEN", "default_secure_token_here")  # 외부 요청 검증용 토큰
-ALLOWED_WEBHOOK_IDS = os.getenv("ALLOWED_WEBHOOK_IDS", "").split(",")  # 허용할 웹훅 ID 목록 (쉼표로 구분)
+SECURITY_TOKEN = os.environ["SECURITY_TOKEN"]
+ALLOWED_WEBHOOK_IDS = [id_.strip() for id_ in os.environ["ALLOWED_WEBHOOK_IDS"].split(",") if id_.strip()]
 
-# 디스코드 웹훅 URL
-DISCORD_WEBHOOK_URL = os.getenv(
-    "DISCORD_WEBHOOK_URL",
-    "https://discord.com/api/webhooks/1387339352677417040/pwR34IfOMBCdxClgJobTYrJ2hi_7fkvqHzNA39C1-Ad7dxNwtGNKeDztdlFYDpkrZwnC"
-)
+# 디스코드 웹훅 URL (필수)
+DISCORD_WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
 
 # 바이낸스 API 엔드포인트
 ENDPOINTS = {
