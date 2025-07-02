@@ -10,8 +10,10 @@ VolMon is a powerful tool that monitors real-time cryptocurrency prices on Binan
 ## Key Features
 
 - Real-time cryptocurrency price monitoring (Binance WebSocket)
-- Customizable volatility threshold (default: 1%)
-- Instant Discord notifications
+- 60-second volatility monitoring for rapid market movement detection
+- Progressive alert thresholds: 0.3% (minimum), 0.5%, 1.0%, 2.0%, 3.0%, 5.0%
+- Minute-by-minute alerts when volatility remains above 0.3%
+- Instant Discord notifications for each threshold crossed
 - Multiple coin monitoring simultaneously
 - Intuitive console interface
 
