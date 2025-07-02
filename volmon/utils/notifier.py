@@ -14,11 +14,22 @@ from volmon.config import SECURITY_TOKEN, ALLOWED_WEBHOOK_IDS
 class NotificationState:
     _instance = None
     
+    # 알림을 보낼 변동률 임계값 목록 (단위: %)
+    THRESHOLDS = [0.3, 0.5, 1.0, 2.0, 3.0, 5.0]
+    
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(NotificationState, cls).__new__(cls)
             cls._instance._state = {}
         return cls._instance
+    
+    def _get_threshold_index(self, change: float) -> int:
+        """변화율에 해당하는 임계값 인덱스를 반환합니다."""
+        abs_change = abs(change)
+        for i, threshold in enumerate(self.THRESHOLDS):
+            if abs_change < threshold:
+                return i - 1
+        return len(self.THRESHOLDS) - 1
     
     def should_notify(self, symbol: str, change: float) -> Tuple[bool, float]:
         """
@@ -32,31 +43,46 @@ class NotificationState:
             tuple: (알림_전송_여부, 마지막_알림_이후_경과_시간(초))
         """
         current_time = time.time()
-        state = self._state.get(symbol, {"last_notified": 0, "last_change": 0})
+        state = self._state.get(symbol, {
+            "last_notified": 0, 
+            "last_change": 0,
+            "last_threshold_index": -1,
+            "last_direction": 0
+        })
         
-        # 마지막 알림 이후 경과한 시간 (초)
-        time_since_last = current_time - state["last_notified"]
+        # 현재 방향 (1: 상승, -1: 하락, 0: 변화 없음)
+        current_direction = 1 if change > 0 else (-1 if change < 0 else 0)
         
-        # 변동 방향이 바뀌었는지 확인 (상승 → 하락 또는 하락 → 상승)
-        direction_changed = (state["last_change"] * change) < 0
+        # 방향이 바뀌었는지 확인
+        direction_changed = (state["last_direction"] * current_direction) < 0
+        
+        # 현재 변동률의 임계값 인덱스
+        current_threshold_index = self._get_threshold_index(change)
         
         # 알림 조건:
-        # 1. 5분(300초)이 지났거나
-        # 2. 변동 방향이 바뀌었거나
-        # 3. 이전 변동률보다 1.5배 이상 증가한 경우
+        # 1. 방향이 바뀌었거나
+        # 2. 현재 변동률이 새로운 임계값에 도달했거나
+        # 3. 변동률이 0.3% 이상이고, 마지막 알림으로부터 1분(60초)이 지났을 때
         should_notify = (
-            time_since_last >= 300 or  # 5분마다 한 번씩만 알림
             direction_changed or
-            abs(change) >= abs(state["last_change"]) * 1.5
+            current_threshold_index > state["last_threshold_index"] or
+            (abs(change) >= 0.3 and current_time - state["last_notified"] >= 60)
         )
         
+        # 변동률이 0.3% 미만이면 임계값 인덱스 초기화
+        if abs(change) < 0.3:
+            state["last_threshold_index"] = -1
+        
         if should_notify:
-            self._state[symbol] = {
+            state.update({
                 "last_notified": current_time,
-                "last_change": change
-            }
+                "last_change": change,
+                "last_threshold_index": current_threshold_index,
+                "last_direction": current_direction
+            })
+            self._state[symbol] = state
             
-        return should_notify, time_since_last
+        return should_notify, current_time - state["last_notified"]
 
 # 전역 상태 관리자
 notification_state = NotificationState()
