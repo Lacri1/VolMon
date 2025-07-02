@@ -106,7 +106,7 @@ python main.py
 ```
 === VolMon - Cryptocurrency Volatility Monitor ===
 Monitoring 2 coins - BTCUSDT, ETHUSDT
-Alert threshold: 1.0% change within 60 seconds
+Alert threshold: 0.3% change within 60 seconds
 ==================================================
 
 [VolMon] Starting monitoring: BTCUSDT
@@ -118,7 +118,7 @@ Symbol      |      Price (USDT) | Last Updated
 BTCUSDT   |      106,650.13 | 10:16:40
 ETHUSDT   |        2,404.61 | 10:16:41
 
-[BTCUSDT] Volatility detected! Change: +1.23% (Threshold: 1.0%)
+[BTCUSDT] Volatility detected! Change: +0.35% (Threshold: 0.3%)
 [Notifier] Successfully sent alert to Discord
 ```
 
