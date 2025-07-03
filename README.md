@@ -1,11 +1,11 @@
-# VolMon - Cryptocurrency Volatility Monitor
+# volmon - Cryptocurrency Volatility Monitor
 
 [![Python](https://img.shields.io/badge/python-3.7+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 > Real-time cryptocurrency price volatility monitoring and alert system
 
-VolMon is a powerful tool that monitors real-time cryptocurrency prices on Binance exchange and sends instant Discord notifications when price movements exceed your specified threshold.
+volmon is a powerful tool that monitors real-time cryptocurrency prices on Binance exchange and sends instant Discord notifications when price movements exceed your specified threshold.
 
 ## Key Features
 
@@ -31,8 +31,8 @@ VolMon is a powerful tool that monitors real-time cryptocurrency prices on Binan
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Lacri1/VolMon.git
-   cd VolMon
+   git clone https://github.com/Lacri1/volmon.git
+   cd volmon
    ```
 
 2. Create and activate a virtual environment:
