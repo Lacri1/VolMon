@@ -5,7 +5,6 @@ import os
 import time
 import logging
 from pathlib import Path
-import requests
 import json
 import threading
 import websocket
@@ -40,15 +39,16 @@ logger = setup_logging()
 # 프로젝트 루트 디렉토리를 Python 경로에 추가
 sys.path.append(str(Path(__file__).parent))
 
+from volmon.utils.binance_client import get_price
 from volmon.utils.detector import VolatilityDetector
 from volmon.utils.notifier import send_alert
-from volmon.config import SYMBOLS, BASE_WEBSOCKET_URL, ALERT_THRESHOLD, TIME_WINDOW
+from volmon.config import SYMBOLS, BASE_WEBSOCKET_URL, ALERT_THRESHOLD, TIME_WINDOW, UPDATE_INTERVAL
 
 class PriceDisplay:
     def __init__(self, symbols):
         self.prices = {}  # 가격 저장 딕셔너리
         self.last_update = {}  # 마지막 업데이트 시간 저장
-        self.update_interval = 5  # 화면 갱신 주기(초)
+        self.update_interval = UPDATE_INTERVAL  # 화면 갱신 주기(초)
         self.lock = threading.Lock()  # 스레드 안전을 위한 락
         self.last_display_time = 0  # 마지막 화면 갱신 시간
         self.initial_prices_received = False  # 초기 가격 수신 여부
@@ -124,16 +124,12 @@ class TickerMonitor:
         self.last_processed_time = 0  # 마지막 처리 시간
         self.message_queue = []  # 메시지 큐
         self.processing = False  # 메시지 처리 중 플래그
+        self.reconnect_attempts = 0 # 재연결 시도 횟수
 
     def get_current_price_rest(self) -> float:
         """REST API를 사용해 현재 가격 조회"""
-        url = "https://api.binance.com/api/v3/ticker/price"
-        params = {"symbol": self.symbol}
         try:
-            res = requests.get(url, params=params, timeout=5)
-            res.raise_for_status()  # HTTP 에러 확인
-            data = res.json()
-            price = float(data["price"])
+            price = get_price(self.symbol)
             self.display.update_price(self.symbol, price)
             return price
         except Exception as e:
@@ -180,27 +176,41 @@ class TickerMonitor:
                             timestamp=current_time
                         )
                 
+        except json.JSONDecodeError:
+            logger.error(f"[{self.symbol}] JSON 디코딩 오류: {message}")
+        except (KeyError, TypeError) as e:
+            logger.error(f"[{self.symbol}] 메시지 형식 오류 (키 또는 타입): {e} - 데이터: {message}")
+        except ValueError:
+            logger.error(f"[{self.symbol}] 가격 변환 오류: {data.get('p', 'N/A')}")
         except Exception as e:
-            logger.error(f"Error processing message: {str(e)[:100]}")
+            logger.error(f"[{self.symbol}] 메시지 처리 중 예상치 못한 오류: {e}")
 
     def on_error(self, ws, error):
         """웹소켓 에러 처리"""
         if hasattr(error, 'status_code') and error.status_code == 429:
-            logger.warning(f"[{self.symbol}] 요청 제한 초과. 재연결 대기 중...")
-            time.sleep(60)  # 1분 대기
+            logger.warning(f"[{self.symbol}] 요청 제한 초과. 60초 후 재연결합니다.")
+            time.sleep(60)
         else:
-            print(f"[{self.symbol}] 오류: {str(error)[:100]}")
+            logger.error(f"[{self.symbol}] 웹소켓 오류: {error}")
 
     def on_close(self, ws, close_status_code, close_msg):
-        """웹소켓 연결 종료 처리"""
-        logger.warning(f"[{self.symbol}] 웹소켓 연결 종료. 재연결 시도 중...")
-        time.sleep(5)
-        self.start()  # 재연결 시도
+        """웹소켓 연결 종료 처리 및 재연결 로직"""
+        logger.warning(f"[{self.symbol}] 웹소켓 연결 종료. 재연결을 시도합니다...")
+        self.reconnect()
 
     def on_open(self, ws):
         """웹소켓 연결 성공 시 호출"""
-        # 로그 파일에만 기록 (화면에는 표시 안 함)
-        logger.debug(f"[{self.symbol}] Websocket connected")
+        logger.info(f"[{self.symbol}] 웹소켓 연결 성공.")
+        self.reconnect_attempts = 0  # 연결 성공 시 재시도 횟수 초기화
+
+    def reconnect(self):
+        """지수 백오프를 사용한 재연결"""
+        self.reconnect_attempts += 1
+        wait_time = min(2 ** self.reconnect_attempts, 60)  # 최대 60초까지 대기
+        logger.info(f"[{self.symbol}] {wait_time}초 후 재연결 시도... ({self.reconnect_attempts}번째 시도)")
+        time.sleep(wait_time)
+        self.start()
+
 
     def start(self):
         """모니터링 시작"""

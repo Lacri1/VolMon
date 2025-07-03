@@ -20,6 +20,7 @@ SYMBOLS = ['btcusdt', 'ethusdt']  # 모니터링할 코인 심볼
 ALERT_THRESHOLD = 0.3  # 변동성 알림 임계값 (%)
 TIME_WINDOW = 60  # 변동성 계산 기간 (초)
 REQUEST_TIMEOUT = 10  # API 요청 제한 시간 (초)
+UPDATE_INTERVAL = 5 # 화면 갱신 주기 (초)
 
 # 보안 설정
 SECURITY_TOKEN = os.environ["SECURITY_TOKEN"]

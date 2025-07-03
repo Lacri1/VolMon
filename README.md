@@ -16,6 +16,7 @@ VolMon is a powerful tool that monitors real-time cryptocurrency prices on Binan
 - Instant Discord notifications for each threshold crossed
 - Multiple coin monitoring simultaneously
 - Intuitive console interface
+- Smart auto-reconnect with exponential backoff for network issues
 
 ## Getting Started
 
@@ -86,6 +87,7 @@ You can configure the following in `volmon/config.py`:
 - `SYMBOLS`: List of cryptocurrency pairs to monitor (default: `['btcusdt', 'ethusdt']`)
 - `ALERT_THRESHOLD`: Volatility threshold for alerts in percentage (default: `0.3`)
 - `TIME_WINDOW`: Time window in seconds for volatility calculation (default: `60`)
+- `UPDATE_INTERVAL`: Console display refresh interval in seconds (default: `5`)
 
 ### Running the Application
 
